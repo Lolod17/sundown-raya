@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sundown Raya</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --gold: #ffd447; --ink: #0e1216; --paper: #f4efe3; --red: #e2564a; --teal: #4fd1c5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #07090b; overflow: hidden; color: var(--paper);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; }
+  #stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #frame { position: relative; }
+  canvas#game { display: block; background: #1d3b40; image-rendering: auto; box-shadow: 0 0 0 1px #2a2f36, 0 30px 80px rgba(0,0,0,.6); }
+  #hud { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s; font-size: 14px; }
+  #hud.show { opacity: 1; }
+  .panel { position: absolute; background: rgba(10, 14, 18, .62); border: 1px solid rgba(255, 212, 71, .28);
+    border-radius: 6px; padding: 8px 11px; backdrop-filter: blur(2px); text-shadow: 0 1px 2px #000; }
+
+  /* mission */
+  #mission { top: 14px; left: 50%; transform: translateX(-50%); min-width: 430px; text-align: center; padding: 8px 16px; }
+  #mission-line { font-weight: bold; letter-spacing: .09em; font-size: 15px; color: var(--gold); }
+  #mission-line.live::before { content: "▮ "; color: var(--red); }
+  #mission-timer { font: bold 22px/1 "Courier New", monospace; color: #fff; margin-top: 3px; }
+  #mission-timer.urgent { color: var(--red); }
+  #objective-row { display: flex; gap: 10px; justify-content: center; align-items: baseline; margin-top: 2px; }
+  #objective { font-size: 13px; color: #e6eadf; }
+  #objective-dist { font: bold 13px "Courier New", monospace; color: var(--teal); }
+
+  /* top-right stats */
+  #topright { top: 14px; right: 14px; text-align: right; min-width: 190px; }
+  #clock { font: bold 13px "Courier New", monospace; color: #cfd6cc; letter-spacing: .06em; }
+  #stars { font-size: 22px; letter-spacing: 3px; line-height: 1; margin: 4px 0 5px; }
+  #stars span { color: #3a3f43; transition: color .15s, text-shadow .15s; }
+  #stars span.on { color: var(--gold); text-shadow: 0 0 8px rgba(255,212,71,.7); }
+  #stars span.on.flash { color: #fff; }
+  #cash { font: bold 20px "Courier New", monospace; color: #8ff0a4; }
+  .rowline { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+
+  /* bottom-left: health + weapon */
+  #vitals { bottom: 16px; left: 16px; min-width: 250px; }
+  .meter { height: 9px; background: #241f22; border-radius: 5px; overflow: hidden; margin: 3px 0 6px; }
+  .meter > i { display: block; height: 100%; width: 100%; transition: width .2s; }
+  #health-bar { background: linear-gradient(90deg, #e2564a, #f08a5d); }
+  #armour-bar { background: linear-gradient(90deg, #4d8ee0, #7fd0ff); }
+  .lbl { font: bold 11px "Courier New", monospace; letter-spacing: .12em; color: #a9b3a9; }
+  .num { font: bold 15px "Courier New", monospace; color: #fff; }
+  #weapon-row { margin-top: 6px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 6px; }
+
+  /* bottom-right: speedometer */
+  #speedo { bottom: 16px; right: 16px; text-align: right; min-width: 170px; opacity: 0; transition: opacity .25s; }
+  #speedo.show { opacity: 1; }
+  #car-name { font: bold 12px "Courier New", monospace; letter-spacing: .1em; color: var(--gold); }
+  #speed-val { font: bold 40px/1 "Courier New", monospace; color: #fff; }
+  #speed-unit { font: bold 11px "Courier New", monospace; color: #a9b3a9; }
+
+  /* minimap */
+  #minimap-wrap { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    width: 186px; height: 186px; border-radius: 50%; overflow: hidden;
+    box-shadow: 0 0 0 2px rgba(255,212,71,.5), 0 8px 24px rgba(0,0,0,.6); }
+  #minimap { width: 186px; height: 186px; background: #3a4a3c; }
+
+  /* district banner */
+  #banner { top: 96px; left: 50%; transform: translateX(-50%); text-align: center; padding: 6px 26px;
+    background: linear-gradient(90deg, rgba(10,14,18,0), rgba(10,14,18,.82), rgba(10,14,18,0));
+    opacity: 0; transition: opacity .45s; }
+  #banner.show { opacity: 1; }
+  #district-name { font: bold 26px/1.1 "Georgia", serif; letter-spacing: .16em; color: #fff; }
+  #district-tag { font-style: italic; font-size: 13px; color: var(--gold); margin-top: 2px; }
+
+  /* dialogue */
+  #dialogue { bottom: 214px; left: 50%; transform: translateX(-50%); max-width: 620px; padding: 0; background: none;
+    border: none; opacity: 0; transition: opacity .3s; }
+  #dialogue.show { opacity: 1; }
+  #dialogue .bubble { display: flex; gap: 8px; align-items: baseline; background: rgba(10,14,18,.78);
+    border-left: 3px solid var(--teal); padding: 7px 14px; border-radius: 4px; }
+  #dialogue-who { font: bold 12px "Courier New", monospace; color: var(--teal); letter-spacing: .1em; }
+  #dialogue-line { font-size: 14px; }
+
+  /* radio */
+  #radio { top: 14px; left: 14px; font: 12px "Courier New", monospace; color: #cfd6cc; max-width: 330px; }
+  #radio::before { content: "ON AIR "; color: var(--red); font-weight: bold; }
+
+  /* toast */
+  #toast { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); font: bold 18px "Trebuchet MS", sans-serif;
+    letter-spacing: .1em; color: #fff; text-shadow: 0 2px 12px #000; opacity: 0; transition: opacity .3s; text-align: center; }
+  #toast.show { opacity: 1; }
+  #toast.big { font-size: 30px; color: var(--gold); }
+
+  /* help */
+  #help-strip { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(-200px);
+    font: 11px "Courier New", monospace; letter-spacing: .08em; color: rgba(240,240,230,.75); transition: opacity 1s; }
+  #help-strip.fade { opacity: 0; }
+
+  /* menus */
+  .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(circle at 50% 40%, rgba(30,20,10,.55), rgba(5,7,9,.94)); }
+  .overlay.show { display: flex; }
+  .card { max-width: 640px; padding: 30px 36px; }
+  .title { font: bold 62px/1 "Georgia", serif; letter-spacing: .2em; color: var(--gold);
+    text-shadow: 0 6px 30px rgba(255,140,60,.45); margin: 0; }
+  .sub { font-style: italic; color: #d9cdb4; margin: 8px 0 22px; letter-spacing: .04em; }
+  button { font: bold 15px "Trebuchet MS", sans-serif; letter-spacing: .14em; padding: 11px 26px; margin: 6px;
+    background: linear-gradient(180deg, #2a3138, #171c21); color: var(--paper); border: 1px solid rgba(255,212,71,.55);
+    border-radius: 5px; cursor: pointer; pointer-events: auto; }
+  button:hover { background: linear-gradient(180deg, #3b444c, #222930); color: #fff; border-color: var(--gold); }
+  #save-summary { font: 12px "Courier New", monospace; color: #9aa39a; margin-top: 14px; letter-spacing: .08em; }
+  .keys { margin-top: 22px; font: 12px "Courier New", monospace; color: #b9c2b6; line-height: 1.9; letter-spacing: .04em; }
+  .keys b { color: var(--gold); }
+  #fingerprint { position: absolute; bottom: 8px; right: 10px; font: 10px "Courier New", monospace; color: #5a6260; display: none; }
+  #fingerprint.show { display: block; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="frame">
+  <canvas id="game" width="1280" height="720"></canvas>
+
+  <div id="hud">
+    <div id="radio" class="panel">RADIO SOLANA: ...cruising the coast, this is Solana 104.6...</div>
+
+    <div id="mission" class="panel">
+      <div id="mission-line">MISI 1/12 — SALT RUN</div>
+      <div id="mission-timer" style="display:none">1:50</div>
+      <div id="objective-row"><span id="objective">Deliver the case to the Coral Marina pier.</span>
+        <span id="objective-dist">0 m</span></div>
+    </div>
+
+    <div id="topright" class="panel">
+      <div id="clock">DAY 1 · 18:24</div>
+      <div id="stars"><span id="star1">★</span><span id="star2">★</span><span id="star3">★</span><span id="star4">★</span><span id="star5">★</span></div>
+      <div id="cash">$600</div>
+    </div>
+
+    <div id="banner"><div id="district-name">CORAL MARINA</div><div id="district-tag">Salt air, borrowed money.</div></div>
+
+    <div id="vitals" class="panel">
+      <div class="rowline"><span class="lbl">HEALTH</span><span class="num" id="health-val">100</span></div>
+      <div class="meter"><i id="health-bar"></i></div>
+      <div class="rowline"><span class="lbl">ARMOUR</span><span class="num" id="armour-val">0</span></div>
+      <div class="meter"><i id="armour-bar" style="width:0%"></i></div>
+      <div class="rowline" id="weapon-row"><span id="weapon-name">Ruano .32</span><span class="num" id="weapon-ammo">42</span></div>
+    </div>
+
+    <div id="speedo" class="panel">
+      <div id="car-name">Vespi Kiwi</div>
+      <div><span id="speed-val">0</span> <span id="speed-unit">KM/H</span></div>
+    </div>
+
+    <div id="minimap-wrap"><canvas id="minimap" width="186" height="186"></canvas></div>
+
+    <div id="dialogue">
+      <div class="bubble"><span id="dialogue-who">Coco:</span><span id="dialogue-line">Welcome to Raya.</span></div>
+    </div>
+
+    <div id="toast">WASD move</div>
+    <div id="help-strip">WASD MOVE · SHIFT SPRINT · E CAR · CLICK SHOOT · Q RADIO · M MUTE · ESC PAUSE</div>
+  </div>
+
+  <div id="menu" class="overlay show">
+    <div class="card">
+      <h1 class="title">SUNDOWN RAYA</h1>
+      <div class="sub">Twelve jobs. Three days. One coast town that never asks where the money came from.</div>
+      <button id="btn-new">NEW STORY</button>
+      <button id="btn-continue">CONTINUE</button>
+      <div id="save-summary">no save on this machine</div>
+      <div class="keys">
+        <b>WASD</b> walk / drive &nbsp; <b>SHIFT</b> sprint &nbsp; <b>E</b> enter or exit a car &nbsp; <b>CLICK</b> shoot<br>
+        <b>1 2 3</b> weapon &nbsp; <b>Q</b> change radio &nbsp; <b>R</b> replay/start job at marker &nbsp; <b>M</b> mute &nbsp; <b>ESC</b> pause
+      </div>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay">
+    <div class="card">
+      <h1 class="title" style="font-size:40px">PAUSED</h1>
+      <div class="sub">Cash <span id="pause-cash">$0</span> · Jobs done <span id="pause-done">0/12</span></div>
+      <button id="btn-resume">RESUME</button>
+      <button id="btn-quit">QUIT TO TITLE</button>
+    </div>
+  </div>
+</div></div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
